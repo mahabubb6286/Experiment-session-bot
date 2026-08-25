@@ -25,12 +25,9 @@ class ConfigEngine:
     def get_random_device(self):
         """র‍্যান্ডম একটি ডিভাইস প্রোফাইল নিয়ে আসবে"""
         return random.choice(self.devices_list)
-
-    def get_country_proxy(self, phone_number: str):
-        """
-        নম্বরের Country Code দেখে DataImpulse SOCKS5 Proxy তৈরি করবে
-        """
-        country_code = "us" # ডিফল্ট ইউএসএ
+        
+def get_country_proxy(self, phone_number: str):
+        country_code = "us"
         if phone_number.startswith("+880"):
             country_code = "bd"
         elif phone_number.startswith("+1"):
@@ -39,9 +36,11 @@ class ConfigEngine:
             country_code = "gb"
         elif phone_number.startswith("+91"):
             country_code = "in"
+        elif phone_number.startswith("+54"):
+            country_code = "ar"
 
-        # DataImpulse-এর কান্ট্রি ইউজারনেম ফরম্যাট
-        targeted_user = f"{self.proxy_user}__country-{country_code}"
+        # DataImpulse _cr.countrycode Format
+        targeted_user = f"{self.proxy_user}_cr.{country_code}"
 
         return {
             "scheme": "socks5",
@@ -50,6 +49,3 @@ class ConfigEngine:
             "username": targeted_user,
             "password": self.proxy_pass
         }
-
-if __name__ == "__main__":
-    print("Config Engine Module Ready!")
