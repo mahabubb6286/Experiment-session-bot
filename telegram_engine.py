@@ -31,9 +31,8 @@ class TelegramEngine:
             system_version=device["system_version"],
             app_version=device["app_version"],
             lang_code=device["lang_code"],
-            system_lang_code=device["system_lang_code"],
             proxy=proxy,
-            in_memory=True # লোকাল ডিক্সে সরাসরি ফাইল না বানিয়ে মেমোরিতে প্রসেস করবে
+            in_memory=True
         )
         
         await client.connect()
@@ -51,7 +50,6 @@ class TelegramEngine:
             # OTP দিয়ে সাইন-ইন
             await client.sign_in(phone_number, phone_hash, otp_code)
         except SessionPasswordNeeded:
-            # যদি আগে থেকেই ২FA সেট করা থাকে (ব্যতিক্রমী কেস)
             return {"status": "error", "message": "Account already has 2FA enabled!"}
         except PhoneCodeInvalid:
             return {"status": "error", "message": "Invalid OTP Code!"}
