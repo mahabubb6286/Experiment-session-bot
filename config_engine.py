@@ -25,8 +25,8 @@ class ConfigEngine:
     def get_random_device(self):
         """র‍্যান্ডম একটি ডিভাইস প্রোফাইল নিয়ে আসবে"""
         return random.choice(self.devices_list)
-        
-def get_country_proxy(self, phone_number: str):
+
+    def get_country_proxy(self, phone_number: str):
         country_code = "us"
         if phone_number.startswith("+880"):
             country_code = "bd"
