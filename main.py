@@ -1,10 +1,20 @@
-import os
 import asyncio
+import nest_asyncio
+
+# Python 3.14 Event Loop Patch
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+import os
 from dotenv import load_dotenv
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from telegram_engine import TelegramEngine
 from converter_engine import ConverterEngine
+
+# বাকি কোড অপরিবর্তিত থাকবে...
 
 # Environment variables load
 load_dotenv()
