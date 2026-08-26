@@ -91,7 +91,7 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
         if data == "admin:countries_list":
             countries = ", ".join(config.allowed_countries) or "No countries configured."
             await message.edit_text(
-                f"🌐 Allowed Countries:\n{countries}",
+                f"🌐 Countries Management:\n{countries}",
                 reply_markup=kb.get_country_keyboard(),
             )
             return
