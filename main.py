@@ -1,18 +1,19 @@
 import asyncio
 
 import nest_asyncio
-from pyrogram import Client
-
-from config_engine import ConfigEngine
-from handlers.admin_handlers import register_admin_handlers
-from handlers.user_handlers import register_user_handlers
-from telegram_engine import TelegramEngine
 
 
 try:
     asyncio.get_event_loop()
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
+
+from pyrogram import Client
+
+from config_engine import ConfigEngine
+from handlers.admin_handlers import register_admin_handlers
+from handlers.user_handlers import register_user_handlers
+from telegram_engine import TelegramEngine
 
 
 config = ConfigEngine()
