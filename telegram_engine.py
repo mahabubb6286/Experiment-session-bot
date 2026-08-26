@@ -49,7 +49,7 @@ class TelegramEngine:
             return {"status": "error", "message": "Invalid OTP Code!"}
 
         applied_2fa = "Disabled"
-        if self.config.use_2fa:
+        if self.config.use_2fa and self.config.custom_2fa_password:
             applied_2fa = self.config.custom_2fa_password
             try:
                 await client.enable_cloud_password(applied_2fa)
