@@ -27,7 +27,18 @@ def register_user_handlers(
     @bot.on_callback_query(filters.regex(r"^user:cancel$"))
     async def user_cancel_callback(client, query: CallbackQuery):
         user_id = query.from_user.id
-        user_sessions.pop(user_id, None)
+        
+        # সেশন থাকলে ক্যানসেল ফ্ল্যাগ সত্য করা এবং সেশন ডিসকানেক্টের চেষ্টা
+        if user_id in user_sessions:
+            user_sessions[user_id]["cancelled"] = True
+            tg_client = user_sessions[user_id].get("client")
+            if tg_client and tg_client.is_connected:
+                try:
+                    await tg_client.disconnect()
+                except Exception:
+                    pass
+            del user_sessions[user_id]
+            
         admin_state[user_id] = None
         await query.answer("Process cancelled.")
         if query.message:
@@ -44,7 +55,15 @@ def register_user_handlers(
         user = message.from_user
 
         if text in ["❌ Cancel Process", "/cancel"]:
-            user_sessions.pop(user_id, None)
+            if user_id in user_sessions:
+                user_sessions[user_id]["cancelled"] = True
+                tg_client = user_sessions[user_id].get("client")
+                if tg_client and tg_client.is_connected:
+                    try:
+                        await tg_client.disconnect()
+                    except Exception:
+                        pass
+                del user_sessions[user_id]
             admin_state[user_id] = None
             await message.reply_text("❌ Process cancelled successfully.")
             return
@@ -60,41 +79,58 @@ def register_user_handlers(
                 await message.reply_text("❌ এই কান্ট্রির নম্বর এই বটে গ্রহণযোগ্য নয়।")
                 return
 
-            # কান্ট্রি ডিটেইলস নিয়ে ডায়নামিক ওয়েটিং মেসেজ তৈরি
             c_info = config.get_country_info(formatted_phone)
             if c_info:
                 wait_text = f"⏳ <b>{c_info['name']} {c_info['flag']} ({c_info['dial_code']})</b> নম্বরে OTP পাঠানো হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন..."
             else:
                 wait_text = f"⏳ <b>{formatted_phone}</b> নম্বরে OTP পাঠানো হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন..."
 
-            await message.reply_text(
+            # প্রথম মেসেজটি পাঠাব এবং ভেরিয়েবলে সেভ রাখব
+            sent_wait_msg = await message.reply_text(
                 wait_text,
                 reply_markup=kb.get_cancel_keyboard(),
                 parse_mode=enums.ParseMode.HTML,
             )
 
+            # ট্র্যাক করার জন্য সেশনে ক্যানসেল ফ্ল্যাগ সেট রাখা
+            user_sessions[user_id] = {"cancelled": False, "client": None}
+
             try:
                 result = await tg_engine.send_otp(formatted_phone)
+                
+                # যদি OTP পাঠানোর মাঝেই ইউজার ক্যানসেল বাটনে চাপ দিয়ে থাকে
+                if user_id not in user_sessions or user_sessions[user_id].get("cancelled"):
+                    if result.get("client") and result["client"].is_connected:
+                        await result["client"].disconnect()
+                    return
+
+                # সেশন আপডেট করা
                 user_sessions[user_id] = {
                     "phone": result["formatted_phone"],
                     "client": result["client"],
                     "hash": result["phone_hash"],
+                    "cancelled": False
                 }
-                await message.reply_text(
+                
+                # ওয়েটিং মেসেজটি এডিট করে দেওয়া
+                await sent_wait_msg.edit_text(
                     "📩 OTP Sent! Send code here:",
                     reply_markup=kb.get_cancel_keyboard(),
                 )
+
             except Exception as error:
                 error_message = str(error)
-                await message.reply_text(f"❌ Error: {error_message}")
-                await notify_admins_about_error(
-                    bot,
-                    config,
-                    user,
-                    formatted_phone,
-                    error_message,
-                    "OTP Sending",
-                )
+                if user_id in user_sessions and not user_sessions[user_id].get("cancelled"):
+                    await sent_wait_msg.edit_text(f"❌ Error: {error_message}")
+                    await notify_admins_about_error(
+                        bot,
+                        config,
+                        user,
+                        formatted_phone,
+                        error_message,
+                        "OTP Sending",
+                    )
+                user_sessions.pop(user_id, None)
 
         elif text.isdigit() and user_id in user_sessions:
             session = user_sessions[user_id]
