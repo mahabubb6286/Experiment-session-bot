@@ -1,7 +1,5 @@
 import asyncio
-
 import nest_asyncio
-
 
 try:
     asyncio.get_event_loop()
@@ -14,7 +12,6 @@ from config_engine import ConfigEngine
 from handlers.admin_handlers import register_admin_handlers
 from handlers.user_handlers import register_user_handlers
 from telegram_engine import TelegramEngine
-
 
 config = ConfigEngine()
 tg_engine = TelegramEngine(config)
@@ -29,6 +26,15 @@ bot = Client(
 user_sessions = {}
 admin_state = {}
 
+# ১. আগে Admin Handlers রেজিস্টার করতে হবে
+register_admin_handlers(
+    bot,
+    config,
+    tg_engine,
+    admin_state,
+)
+
+# ২. তারপর User Handlers রেজিস্টার করতে হবে
 register_user_handlers(
     bot,
     config,
@@ -36,8 +42,6 @@ register_user_handlers(
     user_sessions,
     admin_state,
 )
-register_admin_handlers(bot, config, tg_engine, admin_state)
-
 
 if __name__ == "__main__":
     print("🤖 Upgraded Admin Panel Bot Running...")
