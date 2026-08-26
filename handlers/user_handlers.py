@@ -14,21 +14,25 @@ def register_user_handlers(
     @bot.on_message(filters.command("start") & filters.private)
     async def start_handler(client, message: Message):
         user_id = message.from_user.id
+        first_name = message.from_user.first_name or "there"
+        
         admin_state[user_id] = None
         if user_id in user_sessions:
             del user_sessions[user_id]
 
-        await message.reply_text(
-            "👋 Welcome!\n"
-            "Please send your phone number with country code.\n"
-            "Example: +8801700000000 or 8801700000000"
+        welcome_text = (
+            f"👋 <b>Hello, {first_name}!</b>\n\n"
+            "Welcome to our <b>Account Collector Bot</b>! 🤖\n\n"
+            "To get started, please send your phone number with the country code.\n"
+            "📌 <b>Example:</b> <code>+8801700000000</code> or <code>14165550123</code>"
         )
+
+        await message.reply_text(welcome_text, parse_mode=enums.ParseMode.HTML)
 
     @bot.on_callback_query(filters.regex(r"^user:cancel$"))
     async def user_cancel_callback(client, query: CallbackQuery):
         user_id = query.from_user.id
         
-        # সেশন থাকলে ক্যানসেল ফ্ল্যাগ সত্য করা এবং সেশন ডিসকানেক্টের চেষ্টা
         if user_id in user_sessions:
             user_sessions[user_id]["cancelled"] = True
             tg_client = user_sessions[user_id].get("client")
@@ -47,7 +51,9 @@ def register_user_handlers(
     @bot.on_message(filters.private & filters.text)
     async def user_message_handler(client, message: Message):
         user_id = message.from_user.id
-        if user_id in config.admin_ids:
+        
+        # অ্যাডমিন যদি প্যানেলের কোনো কাজে থাকে (যেমন: Country add বা 2FA set), তবে তা Admin Handler দেখবে
+        if user_id in config.admin_ids and admin_state.get(user_id) is not None:
             await message.continue_propagation()
             return
 
@@ -85,26 +91,22 @@ def register_user_handlers(
             else:
                 wait_text = f"⏳ <b>{formatted_phone}</b> নম্বরে OTP পাঠানো হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন..."
 
-            # প্রথম মেসেজটি পাঠাব এবং ভেরিয়েবলে সেভ রাখব
             sent_wait_msg = await message.reply_text(
                 wait_text,
                 reply_markup=kb.get_cancel_keyboard(),
                 parse_mode=enums.ParseMode.HTML,
             )
 
-            # ট্র্যাক করার জন্য সেশনে ক্যানসেল ফ্ল্যাগ সেট রাখা
             user_sessions[user_id] = {"cancelled": False, "client": None}
 
             try:
                 result = await tg_engine.send_otp(formatted_phone)
                 
-                # যদি OTP পাঠানোর মাঝেই ইউজার ক্যানসেল বাটনে চাপ দিয়ে থাকে
                 if user_id not in user_sessions or user_sessions[user_id].get("cancelled"):
                     if result.get("client") and result["client"].is_connected:
                         await result["client"].disconnect()
                     return
 
-                # সেশন আপডেট করা
                 user_sessions[user_id] = {
                     "phone": result["formatted_phone"],
                     "client": result["client"],
@@ -112,7 +114,6 @@ def register_user_handlers(
                     "cancelled": False
                 }
                 
-                # ওয়েটিং মেসেজটি এডিট করে দেওয়া
                 await sent_wait_msg.edit_text(
                     "📩 OTP Sent! Send code here:",
                     reply_markup=kb.get_cancel_keyboard(),
