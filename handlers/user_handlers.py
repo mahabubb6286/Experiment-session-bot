@@ -22,8 +22,8 @@ def register_user_handlers(
 
         welcome_text = (
             f"👋 <b>Hello, {first_name}!</b>\n\n"
-            "Welcome to our <b>Account Collector Bot</b>! 🤖\n\n"
-            "To get started, please send your phone number with the country code.\n"
+            "Welcome to our <b>Account receiver Robot</b>! 🤖\n\n"
+            "To get started, please send your phone number.\n"
             "📌 <b>Example:</b> <code>+8801700000000</code> or <code>14165550123</code>"
         )
 
