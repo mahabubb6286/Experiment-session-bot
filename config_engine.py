@@ -2,7 +2,6 @@ import os
 import json
 import random
 import phonenumbers
-from phonenumbers import geocoder
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,11 +19,13 @@ class ConfigEngine:
         self.proxy_user = os.getenv("PROXY_USER")
         self.proxy_pass = os.getenv("PROXY_PASS")
 
-        # Custom 2FA & Allowed Countries (Default)
-        self.custom_2fa_password = os.getenv("DEFAULT_2FA_PASS", "Default2FA@123")
-        self.allowed_countries = ["BD", "US", "CL", "IN", "AR"] # ISO Country Codes (Uppercase)
+        # Dynamic 2FA Settings (Controlled via Admin Panel)
+        self.use_2fa = True
+        self.custom_2fa_password = "Default2FA@123"
+        
+        # Allowed Countries (ISO Codes)
+        self.allowed_countries = ["BD", "US", "CL", "IN", "AR"]
 
-        # Load Devices
         with open("devices.json", "r") as f:
             self.devices_list = json.load(f)
 
@@ -32,7 +33,6 @@ class ConfigEngine:
         return random.choice(self.devices_list)
 
     def get_country_info(self, phone_number: str):
-        """নম্বর থেকে ডায়নামিকালি ISO Country Code বের করবে (যেমন: CL, BD, US)"""
         try:
             parsed = phonenumbers.parse(phone_number, None)
             if not phonenumbers.is_valid_number(parsed):
@@ -47,10 +47,8 @@ class ConfigEngine:
         return country in self.allowed_countries if country else False
 
     def get_country_proxy(self, phone_number: str):
-        """ডায়নামিকালি দেশের প্রক্সি যুক্ত করার লজিক"""
         country = self.get_country_info(phone_number)
         country_code = country.lower() if country else "us"
-
         targeted_user = f"{self.proxy_user}_cr.{country_code}"
 
         return {
