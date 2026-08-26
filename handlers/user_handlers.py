@@ -1,5 +1,5 @@
 from pyrogram import filters
-from pyrogram.types import Message, ReplyKeyboardRemove
+from pyrogram.types import CallbackQuery, Message
 
 import keyboards as kb
 
@@ -19,11 +19,19 @@ def register_user_handlers(
             del user_sessions[user_id]
 
         await message.reply_text(
-            "👋 **Welcome!**\n"
+            "👋 Welcome!\n"
             "Please send your phone number with country code.\n"
-            "Example: `+8801700000000` or `8801700000000`",
-            reply_markup=ReplyKeyboardRemove(),
+            "Example: +8801700000000 or 8801700000000"
         )
+
+    @bot.on_callback_query(filters.regex(r"^user:cancel$"))
+    async def user_cancel_callback(client, query: CallbackQuery):
+        user_id = query.from_user.id
+        user_sessions.pop(user_id, None)
+        admin_state[user_id] = None
+        await query.answer("Process cancelled.")
+        if query.message:
+            await query.message.edit_text("❌ Process cancelled successfully.")
 
     @bot.on_message(filters.private & filters.text)
     async def user_message_handler(client, message: Message):
@@ -36,13 +44,9 @@ def register_user_handlers(
         user = message.from_user
 
         if text in ["❌ Cancel Process", "/cancel"]:
-            if user_id in user_sessions:
-                del user_sessions[user_id]
+            user_sessions.pop(user_id, None)
             admin_state[user_id] = None
-            await message.reply_text(
-                "❌ Process cancelled successfully.",
-                reply_markup=ReplyKeyboardRemove(),
-            )
+            await message.reply_text("❌ Process cancelled successfully.")
             return
 
         formatted_phone = config.format_phone_number(text)
@@ -73,10 +77,7 @@ def register_user_handlers(
                 )
             except Exception as error:
                 error_message = str(error)
-                await message.reply_text(
-                    f"❌ Error: {error_message}",
-                    reply_markup=ReplyKeyboardRemove(),
-                )
+                await message.reply_text(f"❌ Error: {error_message}")
                 await notify_admins_about_error(
                     bot,
                     config,
@@ -88,10 +89,7 @@ def register_user_handlers(
 
         elif text.isdigit() and user_id in user_sessions:
             session = user_sessions[user_id]
-            await message.reply_text(
-                "⚡ Verifying...",
-                reply_markup=ReplyKeyboardRemove(),
-            )
+            await message.reply_text("⚡ Verifying...")
 
             try:
                 result = await tg_engine.complete_login(
@@ -107,14 +105,13 @@ def register_user_handlers(
                     username = f"@{user.username}" if user.username else "No Username"
                     country = result["country"]
                     notify_text = (
-                        "🎉 **New Account Added Successfully!**\n\n"
-                        f"👤 **Adder Name:** {user.first_name} {user.last_name or ''}\n"
-                        f"🆔 **User ID:** `{user.id}`\n"
-                        f"🔗 **Username:** {username}\n"
-                        f"📞 **Phone Number:** `{result['formatted_phone']}`\n"
-                        f"🌍 **Country:** `{country}`\n"
-                        f"🔐 **2FA Status:** "
-                        f"`{'Enabled' if config.use_2fa else 'Disabled'}`"
+                        "🎉 New Account Added Successfully!\n\n"
+                        f"Adder Name: {user.first_name} {user.last_name or ''}\n"
+                        f"User ID: {user.id}\n"
+                        f"Username: {username}\n"
+                        f"Phone Number: {result['formatted_phone']}\n"
+                        f"Country: {country}\n"
+                        f"2FA Status: {'Enabled' if config.use_2fa else 'Disabled'}"
                     )
                     for admin_id in config.admin_ids:
                         try:
@@ -160,13 +157,13 @@ async def notify_admins_about_error(
 ):
     username = f"@{user.username}" if user.username else "No Username"
     error_text = (
-        "⚠️ **User Account Addition Failed!**\n\n"
-        f"👤 **User:** {user.first_name} {user.last_name or ''}\n"
-        f"🆔 **User ID:** `{user.id}`\n"
-        f"🔗 **Username:** {username}\n"
-        f"📞 **Phone Number:** `{phone_number}`\n"
-        f"📌 **Stage:** `{stage}`\n"
-        f"❌ **Error Details:** `{error_message}`"
+        "⚠️ User Account Addition Failed!\n\n"
+        f"User: {user.first_name} {user.last_name or ''}\n"
+        f"User ID: {user.id}\n"
+        f"Username: {username}\n"
+        f"Phone Number: {phone_number}\n"
+        f"Stage: {stage}\n"
+        f"Error Details: {error_message}"
     )
     for admin_id in config.admin_ids:
         try:
