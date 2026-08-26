@@ -1,11 +1,8 @@
 import os
 import zipfile
-
 from pyrogram import filters
 from pyrogram.types import CallbackQuery, Message
-
 import keyboards as kb
-
 
 def register_admin_handlers(bot, config, tg_engine, admin_state):
     @bot.on_message(filters.command("admin") & filters.private)
@@ -100,7 +97,7 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
         if data == "admin:country_add":
             admin_state[user_id] = "ADD_COUNTRY"
             await message.edit_text(
-                "Send a two-letter ISO country code to add, for example BD or US.",
+                "Send country Name, ISO code (e.g., BD), or Dial code (e.g., +880):",
                 reply_markup=kb.get_back_to_main_keyboard(),
             )
             return
@@ -108,7 +105,7 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
         if data == "admin:country_remove":
             admin_state[user_id] = "REMOVE_COUNTRY"
             await message.edit_text(
-                "Send the two-letter country code to remove, for example BD or US.",
+                "Send country Name, ISO code, or Dial code to remove:",
                 reply_markup=kb.get_back_to_main_keyboard(),
             )
             return
@@ -154,28 +151,46 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
             return
 
         if state == "ADD_COUNTRY":
-            country_code = text.upper()
-            if len(country_code) != 2 or not country_code.isalpha():
-                await message.reply_text("Send exactly a two-letter ISO country code, for example BD.")
+            matched = config.search_country_for_whitelist(text)
+            if not matched:
+                await message.reply_text("❌ No country found! Try sending Name, Code (e.g., BD), or Calling Code (e.g., +880).")
                 return
-            if country_code not in config.allowed_countries:
-                config.allowed_countries.append(country_code)
+
+            added_list = []
+            for c in matched:
+                if c["code"].upper() not in config.allowed_countries:
+                    config.allowed_countries.append(c["code"].upper())
+                    added_list.append(f"{c['name']} {c['flag']} ({c['code']})")
+
             admin_state[user_id] = None
-            await message.reply_text(
-                f"✅ Country {country_code} added for this runtime.",
-                reply_markup=kb.get_country_keyboard(),
-            )
+            if added_list:
+                msg = "✅ Added to Whitelist:\n" + "\n".join(added_list)
+            else:
+                msg = "⚠️ Selected country/countries are already in the Whitelist."
+            
+            await message.reply_text(msg, reply_markup=kb.get_country_keyboard())
             return
 
         if state == "REMOVE_COUNTRY":
-            country_code = text.upper()
-            if country_code in config.allowed_countries:
-                config.allowed_countries.remove(country_code)
-                result = f"✅ Country {country_code} removed."
-            else:
-                result = f"❌ Country {country_code} is not in the current list."
+            matched = config.search_country_for_whitelist(text)
+            if not matched:
+                await message.reply_text("❌ No country found!")
+                return
+
+            removed_list = []
+            for c in matched:
+                iso = c["code"].upper()
+                if iso in config.allowed_countries:
+                    config.allowed_countries.remove(iso)
+                    removed_list.append(f"{c['name']} {c['flag']}")
+
             admin_state[user_id] = None
-            await message.reply_text(result, reply_markup=kb.get_country_keyboard())
+            if removed_list:
+                msg = "✅ Removed from Whitelist:\n" + "\n".join(removed_list)
+            else:
+                msg = "❌ None of the matched countries were in the Whitelist."
+
+            await message.reply_text(msg, reply_markup=kb.get_country_keyboard())
             return
 
         if state == "EXPORT_COUNTRY":
@@ -191,7 +206,6 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
             return
 
     return admin_message_handler
-
 
 async def show_country_stats(message: Message, tg_engine, edit=False):
     base_dir = tg_engine.storage_dir
@@ -217,20 +231,9 @@ async def show_country_stats(message: Message, tg_engine, edit=False):
     else:
         await message.reply_text(text, reply_markup=kb.get_back_to_main_keyboard())
 
-
-async def export_sessions(
-    message: Message,
-    tg_engine,
-    keyboard_module,
-    mode="ALL",
-    country_code=None,
-):
+async def export_sessions(message: Message, tg_engine, keyboard_module, mode="ALL", country_code=None):
     base_dir = tg_engine.storage_dir
-    target_dir = (
-        base_dir
-        if mode == "ALL"
-        else os.path.join(base_dir, country_code or "")
-    )
+    target_dir = base_dir if mode == "ALL" else os.path.join(base_dir, country_code or "")
 
     if not os.path.exists(target_dir) or not os.listdir(target_dir):
         await message.reply_text(
