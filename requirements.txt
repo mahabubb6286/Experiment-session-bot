@@ -2,3 +2,5 @@ pyrogram
 tgcrypto
 requests
 nest_asyncio
+phonenumbers
+python-dotenv
