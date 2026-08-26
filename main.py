@@ -1,3 +1,8 @@
+import asyncio
+
+import nest_asyncio
+
+
 try:
     loop = asyncio.get_running_loop()
 except RuntimeError:
