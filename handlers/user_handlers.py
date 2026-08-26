@@ -1,4 +1,4 @@
-from pyrogram import filters
+from pyrogram import enums, filters
 from pyrogram.types import CallbackQuery, Message
 
 import keyboards as kb
@@ -60,10 +60,19 @@ def register_user_handlers(
                 await message.reply_text("❌ এই কান্ট্রির নম্বর এই বটে গ্রহণযোগ্য নয়।")
                 return
 
+            # কান্ট্রি ডিটেইলস নিয়ে ডায়নামিক ওয়েটিং মেসেজ তৈরি
+            c_info = config.get_country_info(formatted_phone)
+            if c_info:
+                wait_text = f"⏳ <b>{c_info['name']} {c_info['flag']} ({c_info['dial_code']})</b> নম্বরে OTP পাঠানো হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন..."
+            else:
+                wait_text = f"⏳ <b>{formatted_phone}</b> নম্বরে OTP পাঠানো হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন..."
+
             await message.reply_text(
-                "🔄 Sending OTP...",
+                wait_text,
                 reply_markup=kb.get_cancel_keyboard(),
+                parse_mode=enums.ParseMode.HTML,
             )
+
             try:
                 result = await tg_engine.send_otp(formatted_phone)
                 user_sessions[user_id] = {
@@ -103,14 +112,16 @@ def register_user_handlers(
                     await message.reply_text("✅ Account successfully received!")
 
                     username = f"@{user.username}" if user.username else "No Username"
-                    country = result["country"]
+                    c_info = result.get("country_info")
+                    country_str = f"{c_info['name']} {c_info['flag']} ({result['country']})" if c_info else result["country"]
+
                     notify_text = (
                         "🎉 New Account Added Successfully!\n\n"
                         f"Adder Name: {user.first_name} {user.last_name or ''}\n"
                         f"User ID: {user.id}\n"
                         f"Username: {username}\n"
                         f"Phone Number: {result['formatted_phone']}\n"
-                        f"Country: {country}\n"
+                        f"Country: {country_str}\n"
                         f"2FA Status: {'Enabled' if config.use_2fa else 'Disabled'}"
                     )
                     for admin_id in config.admin_ids:
