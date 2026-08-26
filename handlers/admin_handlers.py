@@ -2,7 +2,7 @@ import os
 import zipfile
 
 from pyrogram import filters
-from pyrogram.types import Message, ReplyKeyboardRemove
+from pyrogram.types import CallbackQuery, Message
 
 import keyboards as kb
 
@@ -13,11 +13,114 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
         user_id = message.from_user.id
         if user_id in config.admin_ids:
             await message.reply_text(
-                "👑 **Admin Control Panel**",
+                "👑 Admin Control Panel",
                 reply_markup=kb.get_main_admin_keyboard(),
             )
         else:
             await message.reply_text("❌ You are not authorized to use admin commands.")
+
+    @bot.on_callback_query(filters.regex(r"^admin:"))
+    async def admin_callback_handler(client, query: CallbackQuery):
+        user_id = query.from_user.id
+        if user_id not in config.admin_ids:
+            await query.answer("You are not authorized.", show_alert=True)
+            return
+
+        await query.answer()
+        data = query.data
+        message = query.message
+        if message is None:
+            return
+
+        if data == "admin:close":
+            admin_state[user_id] = None
+            await message.edit_text("🔒 Admin panel closed.")
+            return
+
+        if data == "admin:back":
+            admin_state[user_id] = None
+            await message.edit_text(
+                "🔙 Main Menu",
+                reply_markup=kb.get_main_admin_keyboard(),
+            )
+            return
+
+        if data == "admin:2fa":
+            await message.edit_text(
+                "⚙️ 2FA Settings Menu",
+                reply_markup=kb.get_2fa_keyboard(config.use_2fa),
+            )
+            return
+
+        if data == "admin:2fa_toggle":
+            if config.use_2fa:
+                config.use_2fa = False
+                config.custom_2fa_password = None
+                status = "❌ 2FA disabled and the runtime password was cleared."
+            elif config.custom_2fa_password:
+                config.use_2fa = True
+                status = "✅ 2FA enabled with your runtime password."
+            else:
+                admin_state[user_id] = "SET_2FA"
+                await message.edit_text(
+                    "Send a new 2FA password. It will only exist until the bot restarts.",
+                    reply_markup=kb.get_back_to_main_keyboard(),
+                )
+                return
+
+            await message.edit_text(
+                status,
+                reply_markup=kb.get_2fa_keyboard(config.use_2fa),
+            )
+            return
+
+        if data == "admin:2fa_set":
+            admin_state[user_id] = "SET_2FA"
+            await message.edit_text(
+                "Send a new 2FA password. It will only exist until the bot restarts.",
+                reply_markup=kb.get_back_to_main_keyboard(),
+            )
+            return
+
+        if data == "admin:countries":
+            await message.edit_text(
+                "🌐 Country Management Menu",
+                reply_markup=kb.get_country_keyboard(),
+            )
+            return
+
+        if data == "admin:countries_list":
+            countries = ", ".join(config.allowed_countries) or "No countries configured."
+            await message.edit_text(
+                f"🌐 Allowed Countries:\n{countries}",
+                reply_markup=kb.get_country_keyboard(),
+            )
+            return
+
+        if data == "admin:country_add":
+            admin_state[user_id] = "ADD_COUNTRY"
+            await message.edit_text(
+                "Send a two-letter ISO country code to add, for example BD or US.",
+                reply_markup=kb.get_back_to_main_keyboard(),
+            )
+            return
+
+        if data == "admin:country_remove":
+            admin_state[user_id] = "REMOVE_COUNTRY"
+            await message.edit_text(
+                "Send the two-letter country code to remove, for example BD or US.",
+                reply_markup=kb.get_back_to_main_keyboard(),
+            )
+            return
+
+        if data == "admin:export_all":
+            await export_sessions(message, tg_engine, kb, mode="ALL")
+            return
+
+        if data == "admin:export_country":
+            admin_state[user_id] = "EXPORT_COUNTRY"
+            await show_country_stats(message, tg_engine, edit=True)
+            return
 
     @bot.on_message(filters.private & filters.text)
     async def admin_message_handler(client, message: Message):
@@ -27,107 +130,39 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
             return
 
         text = message.text.strip()
+        state = admin_state.get(user_id)
 
-        if text in ["❌ Cancel Process", "/cancel"]:
+        if text in ["/cancel", "❌ Cancel Process"]:
             admin_state[user_id] = None
             await message.reply_text(
-                "❌ Process cancelled successfully.",
-                reply_markup=ReplyKeyboardRemove(),
-            )
-            return
-
-        if text == "❌ Close Panel":
-            admin_state[user_id] = None
-            await message.reply_text(
-                "🔒 Admin panel closed.",
-                reply_markup=ReplyKeyboardRemove(),
-            )
-            return
-
-        if text == "⬅️ Back to Main Menu":
-            admin_state[user_id] = None
-            await message.reply_text(
-                "🔙 Main Menu",
+                "❌ Process cancelled.",
                 reply_markup=kb.get_main_admin_keyboard(),
             )
             return
 
-        if text == "⚙️ 2FA Management":
-            await message.reply_text(
-                "⚙️ **2FA Settings Menu**",
-                reply_markup=kb.get_2fa_keyboard(config.use_2fa),
-            )
-            return
-
-        if text.startswith("2FA Status:"):
-            config.use_2fa = not config.use_2fa
-            status_str = "Enabled ✅" if config.use_2fa else "Disabled ❌"
-            await message.reply_text(
-                f"2FA Protection is now **{status_str}**",
-                reply_markup=kb.get_2fa_keyboard(config.use_2fa),
-            )
-            return
-
-        if text == "🔑 Set 2FA Password":
-            admin_state[user_id] = "SET_2FA"
-            await message.reply_text(
-                f"Current Password: `{config.custom_2fa_password}`\nSend new password:"
-            )
-            return
-
-        if text == "🌐 Allowed Countries":
-            await message.reply_text(
-                "🌐 **Country Management Menu**",
-                reply_markup=kb.get_country_keyboard(),
-            )
-            return
-
-        if text == "📋 List Countries":
-            await message.reply_text(
-                f"Allowed Countries: `{', '.join(config.allowed_countries)}`"
-            )
-            return
-
-        if text == "➕ Add Country":
-            admin_state[user_id] = "ADD_COUNTRY"
-            await message.reply_text(
-                "Send ISO Country Code to Add (e.g., `CL`, `US`, `BD`):"
-            )
-            return
-
-        if text == "➖ Remove Country":
-            admin_state[user_id] = "REMOVE_COUNTRY"
-            await message.reply_text(
-                "Send ISO Country Code to Remove (e.g., `CL`, `US`, `BD`):"
-            )
-            return
-
-        if text == "📦 Import All Sessions":
-            await export_sessions(message, tg_engine, kb, mode="ALL")
-            return
-
-        if text == "🌍 Country Wise Import":
-            await show_country_stats(message, tg_engine)
-            admin_state[user_id] = "EXPORT_COUNTRY"
-            return
-
-        state = admin_state.get(user_id)
         if state == "SET_2FA":
+            if not text:
+                await message.reply_text("Password cannot be empty. Send it again.")
+                return
             config.custom_2fa_password = text
+            config.use_2fa = True
             admin_state[user_id] = None
             await message.reply_text(
-                f"✅ 2FA Password updated to: `{text}`",
+                "✅ 2FA password set and 2FA enabled until the bot restarts.",
                 reply_markup=kb.get_2fa_keyboard(config.use_2fa),
             )
             return
 
         if state == "ADD_COUNTRY":
             country_code = text.upper()
+            if len(country_code) != 2 or not country_code.isalpha():
+                await message.reply_text("Send exactly a two-letter ISO country code, for example BD.")
+                return
             if country_code not in config.allowed_countries:
                 config.allowed_countries.append(country_code)
             admin_state[user_id] = None
             await message.reply_text(
-                f"✅ Country `{country_code}` Added!",
+                f"✅ Country {country_code} added for this runtime.",
                 reply_markup=kb.get_country_keyboard(),
             )
             return
@@ -136,16 +171,11 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
             country_code = text.upper()
             if country_code in config.allowed_countries:
                 config.allowed_countries.remove(country_code)
-                await message.reply_text(
-                    f"✅ Country `{country_code}` Removed!",
-                    reply_markup=kb.get_country_keyboard(),
-                )
+                result = f"✅ Country {country_code} removed."
             else:
-                await message.reply_text(
-                    f"❌ Country `{country_code}` is not in the allowed list.",
-                    reply_markup=kb.get_country_keyboard(),
-                )
+                result = f"❌ Country {country_code} is not in the current list."
             admin_state[user_id] = None
+            await message.reply_text(result, reply_markup=kb.get_country_keyboard())
             return
 
         if state == "EXPORT_COUNTRY":
@@ -163,29 +193,29 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
     return admin_message_handler
 
 
-async def show_country_stats(message: Message, tg_engine):
+async def show_country_stats(message: Message, tg_engine, edit=False):
     base_dir = tg_engine.storage_dir
     if not os.path.exists(base_dir):
-        await message.reply_text("📁 No sessions found.")
-        return
-
-    text = "📊 **Available Sessions by Country:**\n\n"
-    found = False
-    for item in os.listdir(base_dir):
-        item_path = os.path.join(base_dir, item)
-        if os.path.isdir(item_path):
-            count = len(
-                [file for file in os.listdir(item_path) if file.endswith(".session")]
-            )
-            text += f"🏁 **Country `{item}`**: `{count}` accounts\n"
-            found = True
-
-    if not found:
-        text = "📂 Database is empty."
+        text = "📁 No sessions found."
     else:
-        text += "\n👇 **Type/Send the Country Code (e.g., CL, BD, US) to export:**"
+        lines = ["📊 Available Sessions by Country:", ""]
+        found = False
+        for item in os.listdir(base_dir):
+            item_path = os.path.join(base_dir, item)
+            if os.path.isdir(item_path):
+                count = len(
+                    [file for file in os.listdir(item_path) if file.endswith(".session")]
+                )
+                lines.append(f"Country {item}: {count} accounts")
+                found = True
+        text = "\n".join(lines) if found else "📂 Database is empty."
+        if found:
+            text += "\n\nSend the country code to export."
 
-    await message.reply_text(text)
+    if edit:
+        await message.edit_text(text, reply_markup=kb.get_back_to_main_keyboard())
+    else:
+        await message.reply_text(text, reply_markup=kb.get_back_to_main_keyboard())
 
 
 async def export_sessions(
@@ -221,7 +251,7 @@ async def export_sessions(
 
     await message.reply_document(
         document=zip_name,
-        caption=f"✅ Exported Mode: `{mode}` | Code: `{country_code or 'ALL'}`",
+        caption=f"✅ Exported Mode: {mode} | Code: {country_code or 'ALL'}",
     )
     os.remove(zip_name)
     await msg.delete()
