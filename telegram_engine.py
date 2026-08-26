@@ -13,6 +13,8 @@ class TelegramEngine:
 
     async def send_otp(self, phone_number: str):
         formatted_phone = self.config.format_phone_number(phone_number)
+        country_info = self.config.get_country_info(formatted_phone)
+        
         device = self.config.get_random_device()
         proxy = self.config.get_country_proxy(formatted_phone)
         session_name = f"temp_{formatted_phone.replace('+', '')}"
@@ -36,11 +38,15 @@ class TelegramEngine:
             "client": client,
             "phone_hash": sent_code.phone_code_hash,
             "session_name": session_name,
-            "formatted_phone": formatted_phone
+            "formatted_phone": formatted_phone,
+            "country_info": country_info
         }
 
     async def complete_login(self, client: Client, phone_number: str, phone_hash: str, otp_code: str):
         formatted_phone = self.config.format_phone_number(phone_number)
+        c_info = self.config.get_country_info(formatted_phone)
+        country_code = c_info["code"].upper() if c_info else "UNKNOWN"
+        
         try:
             await client.sign_in(formatted_phone, phone_hash, otp_code)
         except SessionPasswordNeeded:
@@ -56,7 +62,6 @@ class TelegramEngine:
             except Exception as e:
                 print(f"2FA Setup Note: {e}")
 
-        country_code = self.config.get_country_info(formatted_phone) or "UNKNOWN"
         country_dir = os.path.join(self.storage_dir, country_code)
         if not os.path.exists(country_dir):
             os.makedirs(country_dir)
@@ -80,4 +85,4 @@ class TelegramEngine:
         await persistent_client.connect()
         await persistent_client.disconnect()
 
-        return {"status": "success", "country": country_code, "formatted_phone": formatted_phone}
+        return {"status": "success", "country": country_code, "formatted_phone": formatted_phone, "country_info": c_info}
