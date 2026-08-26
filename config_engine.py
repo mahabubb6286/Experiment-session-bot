@@ -19,11 +19,11 @@ class ConfigEngine:
         self.proxy_user = os.getenv("PROXY_USER")
         self.proxy_pass = os.getenv("PROXY_PASS")
 
-        # Dynamic 2FA Settings (Controlled via Admin Panel)
+        # Dynamic 2FA Settings
         self.use_2fa = True
         self.custom_2fa_password = "Default2FA@123"
         
-        # Allowed Countries (ISO Codes)
+        # Allowed Countries
         self.allowed_countries = ["BD", "US", "CL", "IN", "AR"]
 
         with open("devices.json", "r") as f:
@@ -32,9 +32,17 @@ class ConfigEngine:
     def get_random_device(self):
         return random.choice(self.devices_list)
 
+    def format_phone_number(self, phone_str: str) -> str:
+        """প্লাস ছাড়া নম্বর দিলেও ডায়নামিকালি + যোগ করে ফরম্যাট করবে"""
+        phone_str = phone_str.strip()
+        if not phone_str.startswith("+"):
+            phone_str = "+" + phone_str
+        return phone_str
+
     def get_country_info(self, phone_number: str):
         try:
-            parsed = phonenumbers.parse(phone_number, None)
+            formatted_phone = self.format_phone_number(phone_number)
+            parsed = phonenumbers.parse(formatted_phone, None)
             if not phonenumbers.is_valid_number(parsed):
                 return None
             country_code = phonenumbers.region_code_for_number(parsed)
