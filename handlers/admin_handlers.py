@@ -9,6 +9,8 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
     async def admin_command_handler(client, message: Message):
         user_id = message.from_user.id
         if user_id in config.admin_ids:
+            # অ্যাডমিন কমান্ড দিলে পূর্বের সব পেন্ডিং স্টেট রিসেট হবে
+            admin_state[user_id] = None
             await message.reply_text(
                 "👑 Admin Control Panel",
                 reply_markup=kb.get_main_admin_keyboard(),
@@ -122,7 +124,9 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
     @bot.on_message(filters.private & filters.text)
     async def admin_message_handler(client, message: Message):
         user_id = message.from_user.id
-        if user_id not in config.admin_ids:
+        
+        # অ্যাডমিন না হলে অথবা অ্যাডমিনের কোনো সক্রিয় প্যানেল স্টেট না থাকলে ইউজার হ্যান্ডলারে পাস করে দেবে
+        if user_id not in config.admin_ids or admin_state.get(user_id) is None:
             await message.continue_propagation()
             return
 
@@ -205,7 +209,8 @@ def register_admin_handlers(bot, config, tg_engine, admin_state):
             )
             return
 
-    return admin_message_handler
+        # অন্য যেকোনো অব্যাখ্যায়িত টেক্সটের ক্ষেত্রে মেসেজ આગળ প্রোপাগেট হতে দেবে
+        await message.continue_propagation()
 
 async def show_country_stats(message: Message, tg_engine, edit=False):
     base_dir = tg_engine.storage_dir
