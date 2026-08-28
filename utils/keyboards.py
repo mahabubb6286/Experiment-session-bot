@@ -1,53 +1,32 @@
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+def main_admin_keyboard():
+    buttons = [
+        [InlineKeyboardButton("📊 System Statistics", callback_data="admin_stats"), InlineKeyboardButton("⚙️ Bot Settings", callback_data="admin_bot_settings")],
+        [InlineKeyboardButton("👥 Users Management", callback_data="admin_users"), InlineKeyboardButton("🌍 Countries Management", callback_data="admin_countries")],
+        [InlineKeyboardButton("🔐 Session Vault", callback_data="admin_sessions"), InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
+        [InlineKeyboardButton("🛠 Backend Controls", callback_data="admin_backend"), InlineKeyboardButton("💳 Card Management", callback_data="admin_cards")],
+        [InlineKeyboardButton("📝 Edit Messages", callback_data="admin_edit_msg"), InlineKeyboardButton("📢 Channels", callback_data="admin_channels")],
+        [InlineKeyboardButton("⚡ Functionality", callback_data="admin_functionality"), InlineKeyboardButton("🔑 API Manage", callback_data="admin_api")],
+        [InlineKeyboardButton("🚫 Bad Account List", callback_data="admin_bad_accs"), InlineKeyboardButton("🔄 Reset Operations", callback_data="admin_reset_menu")]
+    ]
+    return InlineKeyboardMarkup(buttons)
 
-def get_cancel_keyboard():
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("❌ Cancel Process", callback_data="user:cancel")]]
-    )
+def bot_settings_keyboard(config: dict):
+    def get_status_str(val):
+        return "🟢 Enabled" if val else "🔴 Disabled"
 
+    buttons = [
+        [InlineKeyboardButton(f"Bot Status: {'✅ ON' if config.get('bot_status') else '❌ OFF'}", callback_data="toggle_bot_status")],
+        [InlineKeyboardButton(f"Withdrawals: {get_status_str(config.get('withdrawals_enabled'))}", callback_data="toggle_withdrawals")],
+        [InlineKeyboardButton(f"Device Check: {get_status_str(config.get('device_check'))}", callback_data="toggle_device_check")],
+        [InlineKeyboardButton(f"Spam Check: {get_status_str(config.get('spam_check'))}", callback_data="toggle_spam_check")],
+        [InlineKeyboardButton(f"2FA Add: {get_status_str(config.get('two_fa_add'))}", callback_data="toggle_two_fa")],
+        [InlineKeyboardButton(f"Name Change: {get_status_str(config.get('name_change'))}", callback_data="toggle_name_change")],
+        [InlineKeyboardButton(f"Bio Change: {get_status_str(config.get('bio_change'))}", callback_data="toggle_bio_change")],
+        [InlineKeyboardButton("🔙 Return to Dashboard", callback_data="admin_dashboard")]
+    ]
+    return InlineKeyboardMarkup(buttons)
 
-def get_main_admin_keyboard():
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("📦 Import All Sessions", callback_data="admin:export_all"),
-                InlineKeyboardButton("🌍 Country Wise Import", callback_data="admin:export_country"),
-            ],
-            [
-                InlineKeyboardButton("⚙️ 2FA Management", callback_data="admin:2fa"),
-                InlineKeyboardButton("🌐 Allowed Countries", callback_data="admin:countries"),
-            ],
-            [InlineKeyboardButton("❌ Close Panel", callback_data="admin:close")],
-        ]
-    )
-
-
-def get_2fa_keyboard(use_2fa: bool):
-    status_text = "✅ 2FA is ON" if use_2fa else "❌ 2FA is OFF"
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton(status_text, callback_data="admin:2fa_toggle")],
-            [InlineKeyboardButton("🔑 Set 2FA Password", callback_data="admin:2fa_set")],
-            [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="admin:back")],
-        ]
-    )
-
-
-def get_country_keyboard():
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("📋 List Countries", callback_data="admin:countries_list"),
-                InlineKeyboardButton("➕ Add Country", callback_data="admin:country_add"),
-            ],
-            [InlineKeyboardButton("➖ Remove Country", callback_data="admin:country_remove")],
-            [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="admin:back")],
-        ]
-    )
-
-
-def get_back_to_main_keyboard():
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="admin:back")]]
-    )
+def return_to_dashboard_button():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Return to Dashboard", callback_data="admin_dashboard")]])
