@@ -1,5 +1,16 @@
 from database.mongo import get_db
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def init_card_db():
+    """Initializes card database indexes if not present."""
+    db = get_db()
+    # Create unique or regular index on card_name for faster lookups
+    await db.cards.create_index("card_name", unique=True)
+    await db.withdrawals.create_index("user_id")
+    logger.info("Card and withdrawal database indexes initialized successfully.")
 
 async def create_card(card_name: str, owner_id: int, payment_method: str, details: str):
     db = get_db()
