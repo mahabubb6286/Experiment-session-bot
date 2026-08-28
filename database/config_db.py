@@ -10,7 +10,7 @@ async def init_config_db():
     
     # Read core config from environment variables
     bot_token = os.getenv("BOT_TOKEN")
-    mongo_uri = os.getenv("MONGODB_URI")
+    mongo_uri = os.getenv("MONGO_URI")
     main_admin_id = os.getenv("MAIN_ADMIN_ID")
     
     if not bot_token or not mongo_uri or not main_admin_id:
