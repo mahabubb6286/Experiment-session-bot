@@ -37,3 +37,21 @@ async def get_all_sessions():
     async for s in db.sessions.find({}):
         sessions.append(s)
     return sessions
+
+# --- Compatibility Wrapper for user_menu.py ---
+async def save_session(phone_number: str, country_code: str, session_str: str, account_type: str, user_id: int, status: str = "valid"):
+    """user_menu.py থেকে কল করা save_session এরর দূর করার জন্য এবং বিস্তারিত ডাটা সেভ করার জন্য"""
+    db = get_db()
+    session_data = {
+        "user_id": user_id,
+        "phone_number": phone_number,
+        "country_code": country_code,
+        "session_string": session_str,
+        "account_type": account_type,
+        "status": status
+    }
+    await db.sessions.update_one(
+        {"user_id": user_id, "phone_number": phone_number},
+        {"$set": session_data},
+        upsert=True
+    )
