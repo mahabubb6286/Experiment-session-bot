@@ -1,6 +1,9 @@
 pyrogram
 tgcrypto
+motor
+pymongo
 requests
 nest_asyncio
 phonenumbers
 python-dotenv
+pytz
