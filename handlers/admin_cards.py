@@ -20,14 +20,17 @@ async def callback_cards_menu(client: Client, callback: CallbackQuery):
         return await callback.answer("Unauthorized!", show_alert=True)
         
     cards = await get_all_cards()
-    text = "💳 **Withdrawal Cards Management\n\n"
+    text = "💳 **Withdrawal Cards Management**\n\n"
     
     if not cards:
         text += "No cards available."
     else:
         for idx, card in enumerate(cards):
-            status = "🟢 Active" if card["is_active"] else "🔴 Disabled"
-            text += f"{idx+1}. **\n   Min: ${card['min_amount']} | Fee: {card['fee_percentage']}%\n   Status: {status}\n\n"
+            status = "🟢 Active" if card.get("is_active", True) else "🔴 Disabled"
+            card_name = card.get('card_name', 'Unknown')
+            min_amt = card.get('min_amount', 0)
+            fee = card.get('fee_percentage', 0)
+            text += f"{idx+1}. **{card_name}**\n   Min: ${min_amt} | Fee: {fee}%\n   Status: {status}\n\n"
             
     text += "_To add a new card, send a message in this format:_\n`Name | Min Amount | Fee %`\nExample: `Binance Pay | 5.0 | 2`"
     
@@ -36,9 +39,7 @@ async def callback_cards_menu(client: Client, callback: CallbackQuery):
     
     await callback.message.edit_text(text, reply_markup=return_to_dashboard_button())
 
-# The message handler for this state will be integrated in the central message handler or kept here if isolated.
-# Assuming a central handler handles the state:
-@Client.on_message(filters.text & filters.private, group=1) # Group 1 ensures it doesn't conflict with main text handler
+@Client.on_message(filters.text & filters.private, group=1)
 async def handle_card_input(client: Client, message: Message):
     user_id = message.from_user.id
     if user_id not in ADMIN_STATES or not await is_admin(user_id):
