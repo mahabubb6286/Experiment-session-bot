@@ -1,4 +1,14 @@
+import logging
 from database.mongo import get_db
+
+logger = logging.getLogger(__name__)
+
+async def init_user_db():
+    """Initializes user database indexes if not present."""
+    db = get_db()
+    # Create unique index on user_id for optimal performance and preventing duplicates
+    await db.users.create_index("user_id", unique=True)
+    logger.info("User database indexes initialized successfully.")
 
 async def get_user(user_id: int):
     db = get_db()
