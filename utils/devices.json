@@ -1,23 +1,21 @@
-[
-    {
-        "device_model": "Samsung Galaxy S23 Ultra",
-        "system_version": "Android 14",
-        "app_version": "10.8.1",
-        "lang_code": "en",
-        "system_lang_code": "en-US"
-    },
-    {
-        "device_model": "iPhone 15 Pro Max",
-        "system_version": "iOS 17.4",
-        "app_version": "10.9.0",
-        "lang_code": "en",
-        "system_lang_code": "en-US"
-    },
-    {
-        "device_model": "Google Pixel 8 Pro",
-        "system_version": "Android 14",
-        "app_version": "10.8.1",
-        "lang_code": "en",
-        "system_lang_code": "en-US"
-    }
-]
+{
+  "android": [
+    {"app_id": 2040, "app_hash": "b18441a1ed607e10e3949b218311a870", "sdk": "Android 13", "device": "Samsung Galaxy S23", "app_version": "10.2.1"},
+    {"app_id": 2040, "app_hash": "b18441a1ed607e10e3949b218311a870", "sdk": "Android 12", "device": "Google Pixel 7 Pro", "app_version": "10.1.5"},
+    {"app_id": 2040, "app_hash": "b18441a1ed607e10e3949b218311a870", "sdk": "Android 14", "device": "Xiaomi 13 Pro", "app_version": "10.3.0"},
+    {"app_id": 2040, "app_hash": "b18441a1ed607e10e3949b218311a870", "sdk": "Android 11", "device": "OnePlus 9 Pro", "app_version": "9.6.5"}
+  ],
+  "iphone": [
+    {"app_id": 8, "app_hash": "7245de8e747a0d6fbe11f7e01494db81", "sdk": "iOS 16.5", "device": "iPhone 14 Pro Max", "app_version": "10.0.1"},
+    {"app_id": 8, "app_hash": "7245de8e747a0d6fbe11f7e01494db81", "sdk": "iOS 17.1", "device": "iPhone 15 Pro", "app_version": "10.2.0"},
+    {"app_id": 8, "app_hash": "7245de8e747a0d6fbe11f7e01494db81", "sdk": "iOS 15.4", "device": "iPhone 13", "app_version": "9.5.0"}
+  ],
+  "win": [
+    {"app_id": 173491, "app_hash": "371e3be14114ca5822e032121c00222a", "sdk": "Windows 11", "device": "PC 64bit", "app_version": "4.12.2"},
+    {"app_id": 173491, "app_hash": "371e3be14114ca5822e032121c00222a", "sdk": "Windows 10", "device": "Desktop x64", "app_version": "4.10.1"}
+  ],
+  "mac": [
+    {"app_id": 2834, "app_hash": "688f449512b3c10e98031d2793132717", "sdk": "macOS 14.0", "device": "MacBook Pro M2", "app_version": "10.1.0"},
+    {"app_id": 2834, "app_hash": "688f449512b3c10e98031d2793132717", "sdk": "macOS 13.5", "device": "iMac M1", "app_version": "9.9.0"}
+  ]
+}
