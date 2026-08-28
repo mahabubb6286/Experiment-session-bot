@@ -1,4 +1,14 @@
+import logging
 from database.mongo import get_db
+
+logger = logging.getLogger(__name__)
+
+async def init_country_db():
+    """Initializes country database indexes if not present."""
+    db = get_db()
+    # Create unique index on country_code for fast and efficient queries
+    await db.countries.create_index("country_code", unique=True)
+    logger.info("Country database indexes initialized successfully.")
 
 async def add_or_update_country(country_code: str, country_name: str, short_name: str, new_price: float, free_price: float, capacity: int, verify_time: int):
     db = get_db()
