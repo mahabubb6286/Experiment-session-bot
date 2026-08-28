@@ -1,88 +1,71 @@
-import os
 import asyncio
+import os
+import logging
 from pyrogram import Client
-from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid
-from config import ConfigEngine
+from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PasswordHashInvalid
+from utils.helpers import generate_dynamic_device_profile
+from services.proxy_manager import get_proxy_dict
+from database.config_db import get_system_config
+
+logger = logging.getLogger(__name__)
 
 class TelegramEngine:
-    def __init__(self, config: ConfigEngine, storage_dir="database_sessions"):
-        self.config = config
-        self.storage_dir = storage_dir
-        if not os.path.exists(self.storage_dir):
-            os.makedirs(self.storage_dir)
-
-    async def send_otp(self, phone_number: str):
-        formatted_phone = self.config.format_phone_number(phone_number)
-        country_info = self.config.get_country_info(formatted_phone)
+    def __init__(self, phone_number: str):
+        self.phone_number = phone_number
+        self.client = None
+        self.phone_code_hash = None
         
-        device = self.config.get_random_device()
-        proxy = self.config.get_country_proxy(formatted_phone)
-        session_name = f"temp_{formatted_phone.replace('+', '')}"
+    async def initialize_client(self):
+        config = await get_system_config()
+        api_id = config.get("api_id")
+        api_hash = config.get("api_hash")
         
-        client = Client(
+        if not api_id or not api_hash:
+            raise ValueError("API ID and API Hash are not configured in system settings!")
+            
+        # Get dynamic real device parameters
+        device = generate_dynamic_device_profile("android")
+        proxy = await get_proxy_dict()
+        
+        session_name = f"temp_{self.phone_number.replace('+', '')}"
+        
+        self.client = Client(
             name=session_name,
-            api_id=self.config.api_id,
-            api_hash=self.config.api_hash,
-            device_model=device["device_model"],
-            system_version=device["system_version"],
+            api_id=int(api_id),
+            api_hash=api_hash,
+            device_model=device["device"],
+            system_version=device["sdk"],
             app_version=device["app_version"],
             lang_code=device["lang_code"],
             proxy=proxy,
             in_memory=True
         )
-        
-        await client.connect()
-        sent_code = await client.send_code(formatted_phone)
-        
-        return {
-            "client": client,
-            "phone_hash": sent_code.phone_code_hash,
-            "session_name": session_name,
-            "formatted_phone": formatted_phone,
-            "country_info": country_info
-        }
+        await self.client.connect()
 
-    async def complete_login(self, client: Client, phone_number: str, phone_hash: str, otp_code: str):
-        formatted_phone = self.config.format_phone_number(phone_number)
-        c_info = self.config.get_country_info(formatted_phone)
-        country_code = c_info["code"].upper() if c_info else "UNKNOWN"
-        
+    async def send_otp(self):
+        await self.initialize_client()
+        sent_code = await self.client.send_code(self.phone_number)
+        self.phone_code_hash = sent_code.phone_code_hash
+        return self.phone_code_hash
+
+    async def complete_login(self, code: str, custom_2fa_password: str = None):
         try:
-            await client.sign_in(formatted_phone, phone_hash, otp_code)
+            await self.client.sign_in(self.phone_number, self.phone_code_hash, code)
         except SessionPasswordNeeded:
-            return {"status": "error", "message": "Account already has 2FA enabled!"}
-        except PhoneCodeInvalid:
-            return {"status": "error", "message": "Invalid OTP Code!"}
-
-        applied_2fa = "Disabled"
-        if self.config.use_2fa and self.config.custom_2fa_password:
-            applied_2fa = self.config.custom_2fa_password
+            if not custom_2fa_password:
+                config = await get_system_config()
+                custom_2fa_password = config.get("two_fa_password", "Experiment247*")
+            await self.client.check_password(custom_2fa_password)
+            
+        # Set Admin Custom 2FA Password if enabled
+        config = await get_system_config()
+        if config.get("two_fa_add") and custom_2fa_password:
             try:
-                await client.enable_cloud_password(applied_2fa)
+                await self.client.enable_cloud_password(custom_2fa_password)
             except Exception as e:
-                print(f"2FA Setup Note: {e}")
+                logger.warning(f"Could not update 2FA Password: {e}")
 
-        country_dir = os.path.join(self.storage_dir, country_code)
-        if not os.path.exists(country_dir):
-            os.makedirs(country_dir)
-
-        clean_phone = formatted_phone.replace("+", "").strip()
-        save_path = os.path.join(country_dir, f"{clean_phone}.session")
-        
-        session_string = await client.export_session_string()
-        await client.disconnect()
-
-        info_path = os.path.join(country_dir, f"{clean_phone}_info.txt")
-        with open(info_path, "w", encoding="utf-8") as f:
-            f.write(f"Phone: {formatted_phone}\nCountry: {country_code}\n2FA: {applied_2fa}\nSession String: {session_string}\n")
-
-        persistent_client = Client(
-            name=save_path.replace(".session", ""),
-            api_id=self.config.api_id,
-            api_hash=self.config.api_hash,
-            session_string=session_string
-        )
-        await persistent_client.connect()
-        await persistent_client.disconnect()
-
-        return {"status": "success", "country": country_code, "formatted_phone": formatted_phone, "country_info": c_info}
+        # Export String Session
+        string_session = await self.client.export_session_string()
+        await self.client.disconnect()
+        return string_session
