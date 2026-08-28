@@ -1,23 +1,39 @@
+import logging
 from database.mongo import get_db
-from datetime import datetime
 
-async def save_session(phone_number: str, country_code: str, session_str: str, account_type: str, user_id: int, status: str = "valid"):
+logger = logging.getLogger(__name__)
+
+async def init_session_db():
+    """Initializes session database indexes if not present."""
+    db = get_db()
+    # Create indexes for fast query handling
+    await db.sessions.create_index("user_id")
+    logger.info("Session database indexes initialized successfully.")
+
+async def add_session(user_id: int, session_string: str, phone_number: str = None):
     db = get_db()
     session_data = {
-        "phone_number": phone_number,
-        "country_code": country_code,
-        "session_str": session_str,
-        "account_type": account_type, # 'new' or 'free'
         "user_id": user_id,
-        "status": status, # 'valid', 'spam', 'contact_restricted', 'frozen', 'bad'
-        "exported": False,
-        "added_at": datetime.utcnow()
+        "session_string": session_string,
+        "phone_number": phone_number,
+        "status": "active"
     }
-    await db.sessions.update_one({"phone_number": phone_number}, {"$set": session_data}, upsert=True)
+    await db.sessions.insert_one(session_data)
 
-async def get_sessions_by_country(country_code: str, account_type: str = None, exported: bool = False):
+async def get_user_sessions(user_id: int):
     db = get_db()
-    query = {"country_code": country_code, "exported": exported}
-    if account_type:
-        query["account_type"] = account_type
-    return await db.sessions.find(query).to_list(length=None)
+    sessions = []
+    async for s in db.sessions.find({"user_id": user_id}):
+        sessions.append(s)
+    return sessions
+
+async def delete_session(user_id: int, session_string: str):
+    db = get_db()
+    await db.sessions.delete_one({"user_id": user_id, "session_string": session_string})
+
+async def get_all_sessions():
+    db = get_db()
+    sessions = []
+    async for s in db.sessions.find({}):
+        sessions.append(s)
+    return sessions
