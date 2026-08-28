@@ -5,7 +5,8 @@ load_dotenv()
 
 # Mandatory Environment Variables
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-MONGO_URI = os.getenv("MONGO_URI", "").strip()
+#MONGO_URI বা MONGODB_URI দুটির যেকোনো একটি থাকলেই কাজ করবে
+MONGO_URI = os.getenv("MONGO_URI", "").strip() or os.getenv("MONGODB_URI", "").strip()
 
 # Main Admin ID
 try:
