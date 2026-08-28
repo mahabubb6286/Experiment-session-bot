@@ -11,10 +11,10 @@ except RuntimeError:
 
 from pyrogram import Client
 
-from config_engine import ConfigEngine
-from handlers.admin_handlers import register_admin_handlers
-from handlers.user_handlers import register_user_handlers
-from telegram_engine import TelegramEngine
+from config import ConfigEngine
+from handlers.admin_panel import register_admin_handlers
+from handlers.start import register_user_handlers
+from services.telegram_engine import TelegramEngine
 
 config = ConfigEngine()
 tg_engine = TelegramEngine(config)
