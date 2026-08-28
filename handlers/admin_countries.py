@@ -35,7 +35,11 @@ async def callback_countries_menu(client: Client, callback: CallbackQuery):
     
     await callback.message.edit_text(text, reply_markup=return_to_dashboard_button())
 
-@Client.on_message(filters.text & filters.private)
+@Client.on_message(
+    filters.text
+    & filters.private
+    & ~filters.command(["start", "help", "admin"])
+)
 async def handle_admin_text_input(client: Client, message: Message):
     user_id = message.from_user.id
     if user_id not in ADMIN_STATES or not await is_admin(user_id):
