@@ -44,3 +44,17 @@ async def get_all_countries():
 async def remove_country(country_code: str):
     db = get_db()
     await db.countries.delete_one({"country_code": country_code})
+
+# --- Compatibility Wrappers for admin_countries.py ---
+async def update_country(country_code: str, country_name: str, new_price: float):
+    """admin_countries.py এর ইম্পোর্ট এরর ঠিক করার জন্য উইথড্রল/প্রাইস আপডেট র‍্যাপার"""
+    db = get_db()
+    await db.countries.update_one(
+        {"country_code": country_code},
+        {"$set": {"country_name": country_name, "new_price": float(new_price)}},
+        upsert=True
+    )
+
+async def delete_country(country_code: str):
+    """remove_country এর বিকল্প নাম হিসেবে কাজ করবে"""
+    await remove_country(country_code)
