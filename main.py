@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pyrogram import Client
+from database.mongo import db_instance
 from database.config_db import init_config_db, get_system_config
 from database.user_db import init_user_db
 from database.session_db import init_session_db
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 async def main():
     logger.info("Initializing database connections...")
     
+    # Connect to MongoDB first
+    await db_instance.connect()
+    
     # Initialize all database collections/tables
     await init_config_db()
     await init_user_db()
@@ -25,9 +29,15 @@ async def main():
     await init_card_db()
     
     config = await get_system_config()
-    bot_token = config.get("bot_token")
-    api_id = config.get("api_id")
-    api_hash = config.get("api_hash")
+    
+    bot_token = None
+    api_id = None
+    api_hash = None
+    
+    if config:
+        bot_token = config.get("bot_token")
+        api_id = config.get("api_id")
+        api_hash = config.get("api_hash")
     
     if not bot_token or not api_id or not api_hash:
         logger.warning("Bot token, API ID or API Hash not set in Config DB! Falling back to env variables...")
