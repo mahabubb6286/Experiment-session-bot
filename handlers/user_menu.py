@@ -34,11 +34,14 @@ async def start_command(client: Client, message: Message):
     )
     
     buttons = [
-        [InlineKeyboardButton("💳 My Balance & Cards", callback_data="user_balance")],
-        [InlineKeyboardButton("📢 Updates Channel", url=config.get("update_channel", "https://t.me"))]
-    ]
-    
-    await message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(buttons))
+          [InlineKeyboardButton("💳 My Balance & Cards", callback_data="user_balance")]
+      ]
+
+      update_channel = str(config.get("update_channel") or "").strip()
+      if update_channel.startswith(("https://", "http://")):
+          buttons.append([InlineKeyboardButton("📢 Updates Channel", url=update_channel)])
+
+        await message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(buttons))
 
 @Client.on_message(filters.text & filters.private & ~filters.command(["start", "admin"]))
 async def handle_user_text_input(client: Client, message: Message):
