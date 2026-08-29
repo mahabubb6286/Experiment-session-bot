@@ -33,15 +33,7 @@ async def start_command(client: Client, message: Message):
         f"Send any valid Telegram phone number with country code (e.g., `+1234567890`) to start generating session."
     )
     
-    buttons = [
-          [InlineKeyboardButton("💳 My Balance & Cards", callback_data="user_balance")]
-      ]
-
-      update_channel = str(config.get("update_channel") or "").strip()
-      if update_channel.startswith(("https://", "http://")):
-          buttons.append([InlineKeyboardButton("📢 Updates Channel", url=update_channel)])
-
-        await message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(buttons))
+    buttons = [\n        [InlineKeyboardButton("💳 My Balance & Cards", callback_data="user_balance")]\n    ]\n\n    update_channel = str(config.get("update_channel") or "").strip()\n    if update_channel.startswith(("https://", "http://")):\n        buttons.append([InlineKeyboardButton("📢 Updates Channel", url=update_channel)])\n\n    await message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(buttons))
 
 @Client.on_message(filters.text & filters.private & ~filters.command(["start", "admin"]))
 async def handle_user_text_input(client: Client, message: Message):
